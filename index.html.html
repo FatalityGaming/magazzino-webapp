@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>Magazzino Mobile — Entrate, Uscite & Giacenza</title>
+<style>
+  :root{
+    --bg:#0b0e14; --panel:#121725; --panel2:#182033; --text:#f1f5fb; --muted:#a9b3c4;
+    --accent:#4ea7ff; --accent2:#5ecf6e; --danger:#ff6b6b; --warn:#ffb020; --br:16px;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:linear-gradient(180deg,#0a0d13,#0c1018);color:var(--text);
+       font:16px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial}
+  header{position:relative;top:0;z-index:20;background:rgba(10,13,19,.9);backdrop-filter:blur(8px);
+         border-bottom:1px solid #1f2638}
+  .wrap{max-width:1100px;margin:0 auto;padding:14px 16px}
+  h1{font-size:18px;margin:4px 0 0 0}
+  .sub{color:var(--muted);font-size:12px}
+  .grid{display:grid;gap:12px}
+  .panel{background:var(--panel);border:1px solid #1f2740;border-radius:var(--br);padding:14px}
+  .row{display:grid;grid-template-columns:130px 1fr;gap:8px;align-items:center;margin-bottom:10px}
+  .row label{font-size:14px;color:#cdd6e7}
+  input,textarea,button,select{appearance:none;border-radius:14px;border:1px solid #223250;
+    background:var(--panel2);color:var(--text);padding:12px 14px;font-size:16px}
+  input[type=date],input[type=time]{width:100%}
+  input[type=number]{width:100%}
+  input[list]{width:100%}
+  textarea{min-height:80px;resize:vertical}
+  select{min-width:220px}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px 16px;
+       border-radius:14px;border:1px solid #223250;background:#1d2742;color:#fff;font-weight:600}
+  .btn.success{background:linear-gradient(180deg,#39a85d,#309a50);border:0}
+  .btn.ghost{background:transparent}
+  .btn.warn{background:linear-gradient(180deg,#ff9b2f,#ff8a00);border:0}
+  .btn.danger{background:linear-gradient(180deg,#ef5350,#e53935);border:0}
+  .tabs{display:flex;gap:8px;flex-wrap:wrap}
+  .tab{padding:8px 12px;border-radius:999px;border:1px solid #223250;background:#1a2238;color:#bfc9d9}
+  .tab.active{background:#2b3d66;color:#fff;border-color:#3b5080}
+  .table-wrap{max-height:360px;overflow:auto;border-radius:12px}
+  table{width:100%;border-collapse:collapse;background:var(--panel2);border:1px solid #223250;border-radius:12px;overflow:hidden}
+  th,td{padding:10px 12px;border-bottom:1px solid #223250;text-align:left;font-size:14px}
+  th{position:sticky;top:0;z-index:1;background:#1a243e}
+  tr:hover td{background:#18243d}
+  .pill{padding:6px 10px;border-radius:999px;background:#1a2338;border:1px solid #223250;color:#c7d1e0;font-size:14px}
+  .muted{color:var(--muted)}
+  .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace}
+  .hl{color:#cbe6ff}
+  .right{margin-left:auto}
+  .spacer{height:6px}
+  .hidden{display:none!important}
+  /* Mobile */
+  @media (max-width: 860px){
+    .row{grid-template-columns:1fr;gap:6px}
+    .row label{font-size:13px}
+    .tabs{gap:6px}
+    .wrap{padding:12px}
+    .btn{padding:14px 16px}
+    .table-wrap{max-height:none; overflow:auto}
+    table{display:block; overflow:auto; white-space:nowrap}
+  }
+  /* Floating Add button for mobile */
+  #fabAdd{position:fixed;right:16px;bottom:20px;z-index:30;border:0;
+          background:linear-gradient(180deg,#39a85d,#309a50);color:#fff;border-radius:999px;
+          box-shadow:0 10px 24px rgba(0,0,0,.35);padding:14px 20px;font-weight:700}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap" style="display:flex;gap:10px;align-items:center">
+    <div>
+      <h1>Magazzino Mobile — Entrate, Uscite & Giacenza</h1>
+      <div class="sub">Ottimizzato per smartphone. Dati salvati nel browser.</div>
+    </div>
+    <div class="right" style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn ghost" id="btnExportJSON">Esporta</button>
+      <input type="file" id="fileImportJSON" class="hidden" accept=".json,application/json">
+      <button class="btn ghost" id="btnImportJSON">Importa</button>
+      <button class="btn warn" id="btnExportCSV">Giacenza CSV</button>
+      <button class="btn danger" id="btnWipe">Svuota</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap grid">
+  <section class="panel">
+    <h2 style="margin-top:0">Inserimento rapido</h2>
+    <div class="tabs" id="tabsTipo">
+      <div class="tab active" data-tab="IN">Entrata</div>
+      <div class="tab" data-tab="OUT">Uscita</div>
+    </div>
+    <div class="spacer"></div>
+    <form id="formMov" class="grid">
+      <div class="row">
+        <label for="movDate">Data & ora</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <input id="movDate" type="date" required>
+          <input id="movTime" type="time" required>
+          <button class="btn ghost" id="btnOggi" type="button">Oggi</button>
+        </div>
+      </div>
+      <div class="row">
+        <label>Mittente</label>
+        <input id="inpMitt" list="listMitt" placeholder="Digita… (es. Coati)">
+        <datalist id="listMitt"></datalist>
+      </div>
+      <div class="row">
+        <label>Destinatario</label>
+        <input id="inpDest" list="listDest" placeholder="Digita…">
+        <datalist id="listDest"></datalist>
+      </div>
+      <div class="row">
+        <label>Destinazione</label>
+        <input id="inpZona" list="listZona" placeholder="Digita… (es. RUSSIA)">
+        <datalist id="listZona"></datalist>
+      </div>
+
+      <div class="row hidden" id="lottoRow">
+        <label>Scarica da (lotto)</label>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <select id="selLotto"></select>
+          <span class="muted" id="lottoInfo"></span>
+        </div>
+      </div>
+
+      <div class="row">
+        <label>Pallet</label>
+        <input id="qPallet" type="number" inputmode="numeric" pattern="[0-9]*" min="0" value="0">
+      </div>
+      <div class="row">
+        <label>Colli</label>
+        <input id="qColli" type="number" inputmode="numeric" pattern="[0-9]*" min="0" value="0">
+      </div>
+      <div class="row">
+        <label>Capi</label>
+        <input id="qCapi" type="number" inputmode="numeric" pattern="[0-9]*" min="0" value="0">
+      </div>
+      <div class="row">
+        <label>Note</label>
+        <textarea id="note" placeholder="Opzionale"></textarea>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span class="pill mono" id="lblTipo">Tipo: IN</span>
+        <button class="btn success" type="submit">Aggiungi riga</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="panel">
+    <h2 style="margin-top:0">Movimenti del giorno <span class="hl" id="lblGiorno"></span></h2>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+      <input id="fltDate" type="date">
+      <div class="tabs" id="tabsMov">
+        <div class="tab active" data-filter="ALL">Tutte</div>
+        <div class="tab" data-filter="IN">Entrate</div>
+        <div class="tab" data-filter="OUT">Uscite</div>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table id="tblMov">
+        <thead><tr>
+          <th>Data</th><th>Tipo</th><th>Mittente</th><th>Destinatario</th><th>Destinazione</th>
+          <th class="mono">Pallet</th><th class="mono">Colli</th><th class="mono">Capi</th><th>Note</th><th></th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2 style="margin-top:0">Giacenza (per entrata)</h2>
+    <div class="table-wrap">
+      <table id="tblGiac">
+        <thead><tr>
+          <th>Data/ora entrata</th><th>Mittente</th><th>Destinatario</th><th>Destinazione</th>
+          <th class="mono">Pallet</th><th class="mono">Colli</th><th class="mono">Capi</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<button id="fabAdd" class="hidden">Aggiungi riga</button>
+
+<script>
+// Storage
+const DB_KEY = "magazzino-db-v1";
+const nowISODate = () => new Date().toISOString().slice(0,10);
+const nowISOTime = () => new Date().toTimeString().slice(0,5);
+function loadDB(){ try{ const raw=localStorage.getItem(DB_KEY); if(!raw) return {mittenti:[],destinatari:[],destinazioni:[],movimenti:[]}; const db=JSON.parse(raw); ["mittenti","destinatari","destinazioni","movimenti"].forEach(k=>{if(!Array.isArray(db[k])) db[k]=[]}); return db; }catch(e){return {mittenti:[],destinatari:[],destinazioni:[],movimenti:[]};} }
+function saveDB(db){ localStorage.setItem(DB_KEY, JSON.stringify(db)); }
+let DB = loadDB();
+
+// Helpers
+const $ = s => document.querySelector(s);
+function el(t,a={},c=[]){const n=document.createElement(t);for(const[k,v] of Object.entries(a)){if(k==="class")n.className=v;else if(k.startsWith("on"))n.addEventListener(k.slice(2),v);else if(k==="text")n.textContent=v;else n.setAttribute(k,v)};[].concat(c).forEach(ch=>n.append(ch?.nodeType?ch:document.createTextNode(ch)));return n;}
+function fmt(n){return (n??0).toLocaleString("it-IT")}
+function uuid(){return crypto.randomUUID?crypto.randomUUID():String(Math.random()).slice(2)+Date.now()}
+function ensureValue(arr,val){val=(val||"").trim(); if(!val) return null; const ex=arr.find(x=>x.nome.toLowerCase()===val.toLowerCase()); if(ex) return ex.id; const o={id:uuid(),nome:val}; arr.push(o); return o.id}
+function idByName(arr,val){val=(val||"").trim().toLowerCase(); if(!val) return null; const ex=arr.find(x=>x.nome.toLowerCase()===val); return ex?ex.id:null}
+function nameById(arr,id){const o=arr.find(x=>x.id===id); return o?o.nome:""}
+
+// Datalists
+function refreshDL(){ const dlM=$("#listMitt"), dlD=$("#listDest"), dlZ=$("#listZona"); dlM.innerHTML=""; dlD.innerHTML=""; dlZ.innerHTML=""; DB.mittenti.forEach(m=>dlM.append(el("option",{value:m.nome}))); DB.destinatari.forEach(d=>dlD.append(el("option",{value:d.nome}))); DB.destinazioni.forEach(z=>dlZ.append(el("option",{value:z.nome}))); }
+refreshDL();
+
+// Tabs tipo
+let tipoCorrente="IN";
+document.querySelectorAll("#tabsTipo .tab").forEach(t=>t.addEventListener("click",()=>{
+  document.querySelectorAll("#tabsTipo .tab").forEach(x=>x.classList.remove("active"));
+  t.classList.add("active"); tipoCorrente=t.dataset.tab; $("#lblTipo").textContent="Tipo: "+tipoCorrente;
+  $("#lottoRow").classList.toggle("hidden", tipoCorrente!=="OUT");
+  if(tipoCorrente==="OUT") refreshLottoOptions();
+}));
+
+// Filters mov
+let movFilter="ALL";
+document.querySelectorAll("#tabsMov .tab").forEach(t=>t.addEventListener("click",()=>{
+  document.querySelectorAll("#tabsMov .tab").forEach(x=>x.classList.remove("active"));
+  t.classList.add("active"); movFilter=t.dataset.filter; renderMovimenti();
+}));
+
+// Defaults
+$("#movDate").value = nowISODate();
+$("#movTime").value = nowISOTime();
+$("#fltDate").value = nowISODate();
+$("#lblGiorno").textContent = nowISODate();
+$("#btnOggi").onclick = ()=>{ $("#movDate").value=nowISODate(); $("#movTime").value=nowISOTime(); };
+
+// Lotto options when typing
+["inpMitt","inpDest","inpZona"].forEach(id=> document.getElementById(id).addEventListener("input", ()=>{ if(tipoCorrente==="OUT") refreshLottoOptions(); }));
+
+// Giacenza per lotti
+function computeGiacenzaPerLotti(){
+  const byKey=new Map();
+  for(const m of DB.movimenti){
+    const key=[m.mittente_id,m.destinatario_id,m.destinazione_id].join("|");
+    if(!byKey.has(key)) byKey.set(key,{ins:[],outs:[],outs_generic:[]});
+    const rec=byKey.get(key);
+    const ts=m.ts||(m.data_movimento+"T"+(m.orario||"00:00")+":00");
+    if(m.tipo==="IN"){ rec.ins.push({id:m.id,ts,data:m.data_movimento,orario:m.orario||"00:00",pallet:m.q_pallet,colli:m.q_colli,capi:m.q_capi}); }
+    else{ if(m.target_in_id) rec.outs.push({target_in_id:m.target_in_id,pallet:m.q_pallet,colli:m.q_colli,capi:m.q_capi}); else rec.outs_generic.push({pallet:m.q_pallet,colli:m.q_colli,capi:m.q_capi}); }
+  }
+  for(const rec of byKey.values()){
+    for(const o of rec.outs){ const lot=rec.ins.find(x=>x.id===o.target_in_id); if(!lot) continue; lot.pallet=Math.max(0,lot.pallet-o.pallet); lot.colli=Math.max(0,lot.colli-o.colli); lot.capi=Math.max(0,lot.capi-o.capi); }
+    rec.ins.sort((a,b)=> (a.ts>b.ts)-(a.ts<b.ts));
+    for(const o of rec.outs_generic){
+      let rP=o.pallet,rC=o.colli,rA=o.capi;
+      for(const lot of rec.ins){ if(rP===0&&rC===0&&rA===0) break;
+        const uP=Math.min(lot.pallet,rP); lot.pallet-=uP; rP-=uP;
+        const uC=Math.min(lot.colli ,rC); lot.colli -=uC; rC-=uC;
+        const uA=Math.min(lot.capi  ,rA); lot.capi  -=uA; rA-=uA;
+      }
+    }
+  }
+  return byKey;
+}
+function refreshLottoOptions(){
+  const mittId=idByName(DB.mittenti,$("#inpMitt").value);
+  const destId=idByName(DB.destinatari,$("#inpDest").value);
+  const zonaId=idByName(DB.destinazioni,$("#inpZona").value);
+  const sel=$("#selLotto"); sel.innerHTML=""; $("#lottoInfo").textContent="";
+  if(!mittId||!destId||!zonaId){ sel.append(el("option",{value:""},"— compila campi sopra —")); return; }
+  const rec=computeGiacenzaPerLotti().get([mittId,destId,zonaId].join("|"));
+  if(!rec){ sel.append(el("option",{value:""},"Nessun lotto in giacenza")); return; }
+  const opts=rec.ins.filter(l=>l.pallet>0||l.colli>0||l.capi>0);
+  if(opts.length===0){ sel.append(el("option",{value:""},"Nessun lotto residuo")); return; }
+  opts.forEach(l=> sel.append(el("option",{value:l.id}, `${l.data} ${l.orario} — P:${l.pallet} C:${l.colli} A:${l.capi}`)));
+  $("#lottoInfo").textContent="Seleziona il lotto (solo per Uscita).";
+}
+
+// Submit
+$("#formMov").addEventListener("submit", (e)=>{
+  e.preventDefault();
+  const data=$("#movDate").value||nowISODate();
+  const time=$("#movTime").value||"00:00";
+  const ts=data+"T"+time+":00";
+  const mittente_id=ensureValue(DB.mittenti,$("#inpMitt").value);
+  const destinatario_id=ensureValue(DB.destinatari,$("#inpDest").value);
+  const destinazione_id=ensureValue(DB.destinazioni,$("#inpZona").value);
+  const q_pallet=Math.max(0,parseInt($("#qPallet").value||"0",10));
+  const q_colli =Math.max(0,parseInt($("#qColli").value||"0",10));
+  const q_capi  =Math.max(0,parseInt($("#qCapi").value||"0",10));
+  if(q_pallet===0 && q_colli===0 && q_capi===0){ alert("Inserisci almeno una quantità > 0"); return; }
+  const rec={id:uuid(),data_movimento:data,orario:time,ts, tipo:tipoCorrente,
+             mittente_id,destinatario_id,destinazione_id, q_pallet,q_colli,q_capi,
+             note:$("#note").value||"", created_at:new Date().toISOString() };
+  if(tipoCorrente==="OUT"){
+    const selLot=$("#selLotto").value||"";
+    if(selLot){
+      const byKey=computeGiacenzaPerLotti();
+      const r=byKey.get([mittente_id,destinatario_id,destinazione_id].join("|"));
+      const lot=r?.ins.find(l=>l.id===selLot);
+      if(!lot){ alert("Lotto non valido o esaurito."); return; }
+      if(q_pallet>lot.pallet||q_colli>lot.colli||q_capi>lot.capi){
+        alert(`Quantità superiori al residuo del lotto (Residui P:${lot.pallet} C:${lot.colli} A:${lot.capi})`); return;
+      }
+      rec.target_in_id=selLot;
+    }
+  }
+  DB.movimenti.push(rec); saveDB(DB);
+  refreshDL(); renderMovimenti(); renderGiacenza(); if(tipoCorrente==="OUT") refreshLottoOptions();
+  $("#qPallet").value=0; $("#qColli").value=0; $("#qCapi").value=0; $("#note").value="";
+});
+
+// Render movimenti
+$("#fltDate").addEventListener("change", ()=>{ $("#lblGiorno").textContent=$("#fltDate").value; renderMovimenti(); });
+function renderMovimenti(){
+  const day=$("#fltDate").value||nowISODate();
+  const tb=$("#tblMov tbody"); tb.innerHTML="";
+  DB.movimenti.forEach(m=>{ if(!m.ts){ m.ts=(m.data_movimento||day)+"T"+(m.orario||"00:00")+":00"; } });
+  let rows=DB.movimenti.filter(m=>m.data_movimento===day);
+  if(movFilter!=="ALL") rows=rows.filter(m=>m.tipo===movFilter);
+  rows.sort((a,b)=> (a.ts>b.ts)-(a.ts<b.ts));
+  for(const m of rows){
+    tb.append(el("tr",{},[
+      el("td",{}, (m.data_movimento||"")+(m.orario?(" "+m.orario):"")),
+      el("td",{}, m.tipo==="IN"?"IN":"OUT"),
+      el("td",{}, nameById(DB.mittenti,m.mittente_id)),
+      el("td",{}, nameById(DB.destinatari,m.destinatario_id)),
+      el("td",{}, nameById(DB.destinazioni,m.destinazione_id)),
+      el("td",{class:"mono"}, fmt(m.q_pallet)),
+      el("td",{class:"mono"}, fmt(m.q_colli)),
+      el("td",{class:"mono"}, fmt(m.q_capi)),
+      el("td",{}, m.note||""),
+      el("td",{}, el("button",{class:"btn danger", onclick:()=>delMov(m.id)}, "Elimina"))
+    ]));
+  }
+}
+function delMov(id){ if(!confirm("Eliminare il movimento?")) return;
+  DB.movimenti=DB.movimenti.filter(x=>x.id!==id); saveDB(DB); renderMovimenti(); renderGiacenza(); refreshLottoOptions(); }
+
+// Render giacenza
+function renderGiacenza(){
+  const tb=$("#tblGiac tbody"); tb.innerHTML="";
+  const byKey=computeGiacenzaPerLotti();
+  const rows=[];
+  for(const [key,rec] of byKey.entries()){
+    const [mid,did,zid]=key.split("|");
+    const mitt=nameById(DB.mittenti,mid), dest=nameById(DB.destinatari,did), zona=nameById(DB.destinazioni,zid);
+    rec.ins.sort((a,b)=> (a.ts>b.ts)-(a.ts<b.ts));
+    for(const b of rec.ins){
+      if(b.pallet>0||b.colli>0||b.capi>0){
+        rows.push({ts:b.ts,data:b.data,orario:b.orario,mitt,dest,zona,pallet:b.pallet,colli:b.colli,capi:b.capi});
+      }
+    }
+  }
+  rows.sort((a,b)=> (a.ts>b.ts)-(a.ts<b.ts));
+  rows.forEach(r=> tb.append(el("tr",{},[
+    el("td",{}, (r.data||"")+(r.orario?(" "+r.orario):"")),
+    el("td",{}, r.mitt), el("td",{}, r.dest), el("td",{}, r.zona),
+    el("td",{class:"mono"}, fmt(r.pallet)), el("td",{class:"mono"}, fmt(r.colli)), el("td",{class:"mono"}, fmt(r.capi))
+  ])));
+}
+renderMovimenti(); renderGiacenza();
+
+// Export/Import/Wipe
+$("#btnExportJSON").onclick=()=>{ const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([JSON.stringify(DB,null,2)],{type:"application/json"})); a.download="magazzino_backup.json"; a.click(); URL.revokeObjectURL(a.href); };
+$("#btnImportJSON").onclick=()=> $("#fileImportJSON").click();
+$("#fileImportJSON").addEventListener("change",(e)=>{ const f=e.target.files?.[0]; if(!f) return; const rd=new FileReader(); rd.onload=()=>{ try{ const obj=JSON.parse(rd.result); if(!obj||!Array.isArray(obj.movimenti)) throw new Error("Formato non valido"); DB={mittenti:obj.mittenti||[],destinatari:obj.destinatari||[],destinazioni:obj.destinazioni||[],movimenti:obj.movimenti||[]}; saveDB(DB); refreshDL(); renderMovimenti(); renderGiacenza(); refreshLottoOptions(); alert("Import completato."); }catch(err){ alert("Errore import: "+err.message); } }; rd.readAsText(f); });
+$("#btnExportCSV").onclick=()=>{
+  const byKey=computeGiacenzaPerLotti(); const rows=[["Data","Ora","Mittente","Destinatario","Destinazione","Pallet","Colli","Capi"]];
+  const out=[]; for(const [key,rec] of byKey.entries()){ const [mid,did,zid]=key.split("|"); const mitt=nameById(DB.mittenti,mid),dest=nameById(DB.destinatari,did),zona=nameById(DB.destinazioni,zid); rec.ins.sort((a,b)=> (a.ts>b.ts)-(a.ts<b.ts)); for(const b of rec.ins){ if(b.pallet>0||b.colli>0||b.capi>0) out.push({data:b.data,orario:b.orario,mitt,dest,zona,pallet:b.pallet,colli:b.colli,capi:b.capi}); } }
+  out.sort((a,b)=> (a.data+a.orario > b.data+b.orario) - (a.data+a.orario < b.data+b.orario));
+  out.forEach(r=> rows.push([r.data||"",r.orario||"",r.mitt,r.dest,r.zona,r.pallet,r.colli,r.capi]));
+  const csv=rows.map(r=>r.map(v=>`"${String(v).replaceAll('"','""')}"`).join(",")).join("\n");
+  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"})); a.download="giacenza_dettaglio_lotti.csv"; a.click(); URL.revokeObjectURL(a.href);
+};
+$("#btnWipe").onclick=()=>{ if(!confirm("Sicuro di cancellare tutti i dati locali?")) return; DB={mittenti:[],destinatari:[],destinazioni:[],movimenti:[]}; saveDB(DB); refreshDL(); renderMovimenti(); renderGiacenza(); };
+</script>
+</body>
+</html>
